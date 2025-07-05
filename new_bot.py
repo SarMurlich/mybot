@@ -358,5 +358,3 @@ if __name__ == "__main__":
     asyncio.run(main())
 
 
-if __name__ == "__main__":
-    asyncio.run(send_success_message(user_id=123456789, ticket_numbers=["101", "102"]))
