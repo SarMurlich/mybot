@@ -17,7 +17,7 @@ from flask import Flask, request
 from yookassa import Configuration, Payment
 import uuid
 from decimal import Decimal, ROUND_HALF_UP
-
+import nest_asyncio
 
 Configuration.account_id = "1085561"  # или os.getenv("YOOKASSA_SHOP_ID")
 Configuration.secret_key = "live_L2jrGwfcPBjEmTk_tJlzN7PaD36dPljqctXPrw0TVbU"  # или os.getenv("YOOKASSA_SECRET_KEY")
@@ -29,7 +29,7 @@ dp = Dispatcher(storage=storage)
 
 available_tickets = 700
 user_start_times = {}  # user_id -> datetime
-
+nest_asyncio.apply()
 
 class Form(StatesGroup):
     name = State()
@@ -308,7 +308,9 @@ def yookassa_webhook():
 
         try:
             ticket_numbers = append_to_sheet(name, phone, count)
-            asyncio.run(send_success_message(user_id, ticket_numbers))
+
+            loop = asyncio.get_event_loop()
+            loop.create_task(send_success_message(user_id, ticket_numbers))
         except Exception as e:
             logging.error(f"Ошибка записи в таблицу или отправки сообщения: {e}")
 
