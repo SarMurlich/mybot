@@ -32,7 +32,7 @@ bot = Bot(token=TOKEN, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
 
 available_tickets = 700
 user_start_times = {}  # user_id -> datetime
-TICKET_PRICE = 1000 # Цена одного билета в рублях
+TICKET_PRICE = 1 # Цена одного билета в рублях
 
 # --- FSM СТЕЙТЫ ---
 class Form(StatesGroup):
