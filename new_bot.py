@@ -408,6 +408,14 @@ def yookassa_webhook():
     return '', 200
 
 
+@dp.message(F.photo)
+async def get_photo_file_id(message: types.Message):
+    # Берем фото самого лучшего качества (последнее в списке)
+    file_id = message.photo[-1].file_id
+    await message.answer(f"📸 Photo file_id: <code>{file_id}</code>")
+    print(f"🖼️ Получен photo file_id: {file_id}")
+
+
 # --- ЗАПУСК ---
 
 def start_flask(loop):
