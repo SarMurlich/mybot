@@ -35,6 +35,7 @@ bot = Bot(token=TOKEN, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
 
 available_tickets = 888
 user_start_times = {}
+BOT_START_TIME = datetime.now()
 
 # --- FSM СТЕЙТЫ ---
 class Form(StatesGroup):
@@ -208,51 +209,70 @@ async def process_phone(message: types.Message, state: FSMContext):
 async def process_ticket_count(message: types.Message, state: FSMContext):
     global available_tickets
     try:
+        # Получаем количество наклеек, которое пользователь хочет КУПИТЬ
         count = int(message.text.strip())
         if count <= 0:
-            raise ValueError
-    except ValueError:
-        await message.answer("❗ Введите корректное число билетов")
+            raise ValueError("Количество должно быть положительным")
+    except (ValueError, TypeError):
+        await message.answer("❗ Введите корректное число наклеек.")
         return
 
     if count > available_tickets:
-        await message.answer(f"⚠️ Осталось только {available_tickets} билетов")
+        await message.answer(f"⚠️ К сожалению, осталось только {available_tickets} наклеек. Пожалуйста, введите меньшее количество.")
         return
 
-    user_id = message.from_user.id
-    start_time = user_start_times.get(user_id)
+    # --- Новая логика расчета кодов и применения акции ---
+    # По умолчанию количество кодов равно количеству купленных наклеек
+    codes_to_generate = count
+    discount_applied = False
     now = datetime.now()
 
-    discounted = False
-    price = TICKET_PRICE * count
-    if count == 3 and start_time and (now - start_time <= timedelta(hours=5)):
-        price = TICKET_PRICE * 2
-        discounted = True
+    # Проверяем, активна ли акция (6 часов с момента старта бота)
+    if (now - BOT_START_TIME) <= timedelta(hours=6):
+        # Если акция активна и пользователь покупает РОВНО 2 наклейки
+        if count == 2:
+            codes_to_generate = 3  # Даем 3 кода (2 купленных + 1 бонусный)
+            discount_applied = True  # Ставим флаг, чтобы показать сообщение об акции
 
-    await state.update_data(ticket_count=count, price=price)
+    # Цена ВСЕГДА рассчитывается по количеству КУПЛЕННЫХ наклеек
+    price = TICKET_PRICE * count
+
+    # Сохраняем в FSM и цену, и ИТОГОВОЕ количество кодов
+    await state.update_data(
+        ticket_count=count,          # Сколько наклеек купил
+        price=price,
+        final_code_count=codes_to_generate  # Сколько кодов в итоге получит
+    )
     user_data = await state.get_data()
     name = user_data.get("name")
     phone = user_data.get("phone")
 
     if not name or not phone:
-        await message.answer("❗ Не удалось получить данные анкеты. Попробуйте заполнить заново.")
+        await message.answer("❗ Не удалось получить данные анкеты. Попробуйте заполнить заново, нажав /start.")
         await state.clear()
         return
 
-    summary = f"✅ Количество наклеек: {count}\n💰 Cтоимость: {price} руб\n\n"
-              f"Количество наклеек забронировано для вас\n"
-              f"на 5 минут👌\n\n"
-              f"‼️<b><i>ВНИМАНИЕ</i></b>‼️ Убедительная просьба\n"
-              f"<b><i>оплачивать только по СБП и сделать</i></b>\n"
-              f"<b><i>скриншот чека!!!</i></b>\n\n"
-              f"После оплаты вам придет сообщение с вашим\n"
-              f"персональным кодом участника🥳\n\n"
-              f"Если возникли сложности, напиши нам\n"
-              f"в телеграмме по номеру <p>+79995295511</p>\n\n"
-              f"<b><i>Если все понятно, жми 'перейти к оплате'</i></b>\n"
-              f"⬇️"
-    if discounted:
-        summary += "\n🎉 <b>Применено спец. предложение🥳</b>"
+    # --- Формируем понятное сообщение для пользователя ---
+    summary = f"✅ Количество наклеек к покупке: {count}\n💰 Cтоимость: {price} руб\n"
+
+    if discount_applied:
+        summary += f"🎉 <b>Применено спец. предложение!</b> Вы получите <b>{codes_to_generate} персональных кодов!</b>\n"
+    else:
+        summary += f"🎁 Количество персональных кодов: {codes_to_generate}\n"
+
+
+    summary += (
+        f"\nКоличество наклеек забронировано для вас на 5 минут👌\n\n"
+        f"‼️<b><i>ВНИМАНИЕ</i></b>‼️ Убедительная просьба "
+        f"<b><i>оплачивать только по СБП и сделать</i></b> "
+        f"<b><i>скриншот чека!!!</i></b>\n\n"
+        f"После оплаты вам придет сообщение с вашим "
+        f"персональным кодом участника🥳\n\n"
+        f"Если возникли сложности, напиши нам "
+        f"в телеграмме по номеру +79995295511\n\n"
+        f"<b><i>Если все понятно, жми 'перейти к оплате'</i></b>\n"
+        f"⬇️"
+    )
 
     try:
         payment_price_str = f"{price:.2f}"
@@ -265,23 +285,23 @@ async def process_ticket_count(message: types.Message, state: FSMContext):
                 "return_url": f"https://t.me/{bot_info.username}?start=payment_done"
             },
             "capture": True,
-            "description": f"Покупка {count} бил. для розыгрыша. Пользователь: {message.from_user.id}",
+            "description": f"Покупка {count} наклеек от NPAuto. Пользователь: {message.from_user.id}",
             "receipt": {
                 "customer": {"phone": phone},
                 "items": [{
-                    "description": f"Электронный билет на розыгрыш ({count} шт.)",
-                    "quantity": "1.00",
-                    "amount": {"value": payment_price_str, "currency": "RUB"},
+                    "description": f"Фирменная наклейка NPAuto ({count} шт.)", # В чеке указываем реальное количество купленных наклеек
+                    "quantity": str(count),
+                    "amount": {"value": f"{TICKET_PRICE:.2f}", "currency": "RUB"}, # Цена за 1 шт.
                     "vat_code": 1,
                     "payment_mode": "full_prepayment",
-                    "payment_subject": "service"
+                    "payment_subject": "commodity" # Наклейка - это товар (commodity)
                 }]
             },
             "metadata": {
                 "tg_id": str(message.from_user.id),
                 "name": name,
                 "phone": phone,
-                "count": str(count)
+                "count": str(codes_to_generate) # ВАЖНО: передаем итоговое количество кодов для их генерации
             }
         }
         
@@ -297,7 +317,8 @@ async def process_ticket_count(message: types.Message, state: FSMContext):
     pay_kb = InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="💳 Перейти к оплате", url=confirmation_url)]
     ])
-    await message.answer(f"{summary}\n\nНажмите кнопку ниже, чтобы перейти к оплате:", reply_markup=pay_kb)
+    # Убираем старый summary и отправляем новый, более структурированный
+    await message.answer(summary, reply_markup=pay_kb, parse_mode=ParseMode.HTML)
     await state.clear()
 
 
@@ -337,7 +358,7 @@ def yookassa_webhook():
             phone = metadata['phone']
             count = int(metadata['count'])
 
-            print(f"Успешная оплата от {name} (ID: {user_id}) на {count} билетов.")
+            print(f"Успешная оплата от {name} (ID: {user_id}) на {count} наклеек.")
 
             # Добавляем билеты в нашу JSON-базу
             ticket_numbers = add_tickets_for_payment(user_id, name, phone, count)
@@ -378,3 +399,9 @@ if __name__ == "__main__":
         asyncio.run(main())
     except KeyboardInterrupt:
         print("Бот остановлен.")
+
+@dp.message(F.video)
+async def get_video_file_id(message: types.Message):
+    file_id = message.video.file_id
+    await message.answer(f"🎥 Video file_id: <code>{file_id}</code>")
+    print(f"🎬 Получен video file_id: {file_id}")
