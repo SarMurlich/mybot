@@ -50,7 +50,6 @@ async def send_welcome(message: types.Message):
     args = message.text.split(maxsplit=1)
     arg = args[1] if len(args) > 1 else None
     print(f"/start received with arg: {arg}")
-        return
 
     # Добавляем пользователя в нашу JSON-базу
     add_user_if_not_exists(
