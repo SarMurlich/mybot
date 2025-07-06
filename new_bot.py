@@ -33,7 +33,6 @@ dp = Dispatcher(storage=storage)
 app = Flask(__name__)
 bot = Bot(token=TOKEN, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
 
-available_tickets = 888
 user_start_times = {}
 BOT_START_TIME = datetime.now()
 
@@ -227,10 +226,6 @@ async def process_ticket_count(message: types.Message, state: FSMContext):
         await message.answer("❗ Введите корректное число наклеек.")
         return
 
-    if count > available_tickets:
-        await message.answer(f"⚠️ К сожалению, осталось только {available_tickets} наклеек. Пожалуйста, введите меньшее количество.")
-        return
-
     # --- Новая логика расчета кодов и применения акции ---
     # По умолчанию количество кодов равно количеству купленных наклеек
     codes_to_generate = count
@@ -337,15 +332,11 @@ async def process_ticket_count(message: types.Message, state: FSMContext):
 # --- FLASK ВЕБХУК ---
 
 async def send_success_message(user_id: int, ticket_numbers: list[str]):
-    """Асинхронно отправляет сообщение об успехе вместе с видео."""
-    global available_tickets
-    
+    """Асинхронно отправляет сообщение об успехе вместе с видео."""    
     # ВАЖНО: количество купленных наклеек может не совпадать с количеством кодов.
     # Чтобы правильно уменьшить остаток, нужно получить его из базы.
     # Но для простоты пока оставим вычитание по количеству кодов.
-    # Если у вас акция "2+1", то вычитаться будет 3, а не 2. Это нужно иметь в виду.
-    available_tickets -= len(ticket_numbers)
-    
+    # Если у вас акция "2+1", то вычитаться будет 3, а не 2. Это нужно иметь в виду.    
     # Вставьте сюда file_id вашего видео
     video_file_id = "BAACAgIAAxkBAAICe2hqf4KRNqxJ4rdSJcZpk0wZaA_SAAIofwAChJZZSxqaBQeuOPLfNgQ" # ЗАМЕНИТЕ НА СВОЙ FILE_ID
 
@@ -420,14 +411,6 @@ def yookassa_webhook():
         logging.error(f"Ошибка в обработчике вебхука: {e}", exc_info=True)
 
     return '', 200
-
-
-@dp.message(F.photo)
-async def get_photo_file_id(message: types.Message):
-    # Берем фото самого лучшего качества (последнее в списке)
-    file_id = message.photo[-1].file_id
-    await message.answer(f"📸 Photo file_id: <code>{file_id}</code>")
-    print(f"🖼️ Получен photo file_id: {file_id}")
 
 
 # --- ЗАПУСК ---
