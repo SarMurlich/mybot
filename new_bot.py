@@ -378,6 +378,13 @@ def yookassa_webhook():
 
     return '', 200
 
+
+@dp.message(F.video)
+async def get_video_file_id(message: types.Message):
+    file_id = message.video.file_id
+    await message.answer(f"🎥 Video file_id: <code>{file_id}</code>")
+    print(f"🎬 Получен video file_id: {file_id}")
+
 # --- ЗАПУСК ---
 
 def start_flask(loop):
@@ -400,8 +407,4 @@ if __name__ == "__main__":
     except KeyboardInterrupt:
         print("Бот остановлен.")
 
-@dp.message(F.video)
-async def get_video_file_id(message: types.Message):
-    file_id = message.video.file_id
-    await message.answer(f"🎥 Video file_id: <code>{file_id}</code>")
-    print(f"🎬 Получен video file_id: {file_id}")
+
