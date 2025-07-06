@@ -62,7 +62,9 @@ async def send_welcome(message: types.Message):
         [InlineKeyboardButton(text='🔍 Узнать правила участия', callback_data='show_rules')]
     ])
 
-    await message.answer(
+    photo_file_id = "AgACAgIAAxkBAAICx2hqkPpqYTYgLjcb4x6Nniyc7nuTAALb9TEbhJZZSzy800ilJfUOAQADAgADeQADNgQ"
+
+    caption_text = (
         f"<b><i>Привет! {html.bold(message.from_user.first_name)}, это бот-помощник команды NPAuto</i></b> 👋 \n\n"
         "Совсем скоро <b><i>МЫ проведем</i></b> свой первый масштабный <b>промо-розыгрыш!</b> 🚗 🎁 \n\n"
         "Победитель станет обладателем легендарной <b><i>Audi A4</i></b>\n\n"
@@ -81,6 +83,12 @@ async def send_welcome(message: types.Message):
         "которая дает право участвовать в нашем\n"
         "следующем мероприятие\n\n"
         "Присоединяйся 🍀",
+        reply_markup=inline_keyboard,
+        parse_mode=ParseMode.HTML
+    )
+    await message.answer_photo(
+        photo=photo_file_id,
+        caption=caption_text,
         reply_markup=inline_keyboard,
         parse_mode=ParseMode.HTML
     )
