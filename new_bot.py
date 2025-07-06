@@ -82,9 +82,7 @@ async def send_welcome(message: types.Message):
         "💫 <b><i>10 покупателей получит - </i></b>наклейку,\n"
         "которая дает право участвовать в нашем\n"
         "следующем мероприятие\n\n"
-        "Присоединяйся 🍀",
-        reply_markup=inline_keyboard,
-        parse_mode=ParseMode.HTML
+        "Присоединяйся 🍀"
     )
     await message.answer_photo(
         photo=photo_file_id,
