@@ -25,7 +25,7 @@ from json_storage import add_user_if_not_exists, add_tickets_for_payment
 Configuration.account_id = "1085561"
 Configuration.secret_key = "live_L2jrGwfcPBjEmTk_tJlzN7PaD36dPljqctXPrw0TVbU"
 TOKEN = my_key
-TICKET_PRICE = 1
+TICKET_PRICE = 1000
 
 # --- ГЛОБАЛЬНЫЕ ПЕРЕМЕННЫЕ ---
 storage = MemoryStorage()
@@ -33,7 +33,7 @@ dp = Dispatcher(storage=storage)
 app = Flask(__name__)
 bot = Bot(token=TOKEN, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
 
-available_tickets = 700
+available_tickets = 888
 user_start_times = {}
 
 # --- FSM СТЕЙТЫ ---
