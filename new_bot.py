@@ -51,6 +51,14 @@ async def send_welcome(message: types.Message):
     arg = args[1] if len(args) > 1 else None
     print(f"/start received with arg: {arg}")
 
+    # --- ИЗМЕНЕННЫЙ БЛОК ---
+    if arg == "payment_done":
+        # Отправляем максимально короткое и полезное сообщение
+        await message.answer(
+            "✅ Спасибо за участие! ✅ "
+        )
+        return
+
     # Добавляем пользователя в нашу JSON-базу
     add_user_if_not_exists(
         user_id=message.from_user.id,
