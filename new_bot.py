@@ -290,7 +290,7 @@ async def process_ticket_count(message: types.Message, state: FSMContext):
                 "return_url": f"https://t.me/{bot_info.username}?start=payment_done"
             },
             "capture": True,
-            "description": f"Покупка {count} наклеек, НДС не облагаеться. Пользователь: {message.from_user.id}",
+            "description": f"Покупка {count} наклеек, НДС не облагается. Пользователь: {message.from_user.id}",
             "receipt": {
                 "customer": {"phone": phone},
                 "items": [{
