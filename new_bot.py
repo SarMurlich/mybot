@@ -233,7 +233,7 @@ async def process_ticket_count(message: types.Message, state: FSMContext):
     now = datetime.now()
 
     # Проверяем, активна ли акция (6 часов с момента старта бота)
-    if (now - BOT_START_TIME) <= timedelta(hours=22):
+    if (now - BOT_START_TIME) <= timedelta(hours=2):
         # Если акция активна и пользователь покупает РОВНО 2 наклейки
         if count == 2:
             codes_to_generate = 3  # Даем 3 кода (2 купленных + 1 бонусный)
