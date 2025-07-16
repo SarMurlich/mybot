@@ -217,9 +217,7 @@ async def process_phone(message: types.Message, state: FSMContext):
 
 @dp.message(Form.ticket_count)
 async def process_ticket_count(message: types.Message, state: FSMContext):
-    global available_tickets
     try:
-        # Получаем количество наклеек, которое пользователь хочет КУПИТЬ
         count = int(message.text.strip())
         if count <= 0:
             raise ValueError("Количество должно быть положительным")
@@ -227,28 +225,20 @@ async def process_ticket_count(message: types.Message, state: FSMContext):
         await message.answer("❗ Введите корректное число наклеек.")
         return
 
-    # --- Новая логика расчета кодов и применения акции ---
-    # По умолчанию количество кодов равно количеству купленных наклеек
-    codes_to_generate = count
-    discount_applied = False
-    now = datetime.now()
+    # --- Новая логика спец. предложения ---
+    bonus_codes = count // 3  # 1 бонусный код за каждые 3 наклейки
+    codes_to_generate = count + bonus_codes
 
-    # Проверяем, активна ли акция (6 часов с момента старта бота)
-    if (now - BOT_START_TIME) <= timedelta(hours=14):
-        # Если акция активна и пользователь покупает РОВНО 2 наклейки
-        if count == 3:
-            codes_to_generate = 4  # Даем 3 кода (2 купленных + 1 бонусный)
-            discount_applied = True  # Ставим флаг, чтобы показать сообщение об акции
-
-    # Цена ВСЕГДА рассчитывается по количеству КУПЛЕННЫХ наклеек
+    # Всегда рассчитываем цену по количеству КУПЛЕННЫХ наклеек
     price = TICKET_PRICE * count
 
-    # Сохраняем в FSM и цену, и ИТОГОВОЕ количество кодов
+    # Сохраняем данные в состояние
     await state.update_data(
-        ticket_count=count,          # Сколько наклеек купил
+        ticket_count=count,
         price=price,
-        final_code_count=codes_to_generate  # Сколько кодов в итоге получит
+        final_code_count=codes_to_generate
     )
+
     user_data = await state.get_data()
     name = user_data.get("name")
     phone = user_data.get("phone")
@@ -258,17 +248,14 @@ async def process_ticket_count(message: types.Message, state: FSMContext):
         await state.clear()
         return
 
-    # --- Формируем понятное сообщение для пользователя ---
-    summary = f"✅ Количество наклеек к покупке: {count}\n💰 Cтоимость: {price} руб\n"
-
-    if discount_applied:
-        summary += f"🎉 <b>Применено спец. предложение!</b> Вы получите <b>{codes_to_generate} персональных кодов!</b>\n"
-    else:
-        summary += f"🎁 Количество персональных кодов: {codes_to_generate}\n"
-
+    # --- Сообщение пользователю ---
+    summary = f"✅ Количество наклеек к покупке: {count}\n💰 Стоимость: {price} руб\n"
+    if bonus_codes > 0:
+        summary += f"🎁 Бонус по акции: +{bonus_codes} персональных кодов!\n"
 
     summary += (
-        f"\nКоличество наклеек забронировано для тебя на 5 минут👌\n\n"
+        f"🔢 Итого персональных кодов: {codes_to_generate}\n\n"
+        f"Количество наклеек забронировано для тебя на 5 минут👌\n\n"
         f"‼️<b><i>ВНИМАНИЕ</i></b>‼️ Убедительная просьба "
         f"<b><i>оплачивать только по СБП и сделать</i></b> "
         f"<b><i>скриншот чека!!!</i></b>\n\n"
@@ -295,25 +282,25 @@ async def process_ticket_count(message: types.Message, state: FSMContext):
             "receipt": {
                 "customer": {"phone": phone},
                 "items": [{
-                    "description": f"Фирменная наклейка NPAuto ({count} шт.)", # В чеке указываем реальное количество купленных наклеек
+                    "description": f"Фирменная наклейка NPAuto ({count} шт.)",
                     "quantity": str(count),
-                    "amount": {"value": f"{TICKET_PRICE:.2f}", "currency": "RUB"}, # Цена за 1 шт.
+                    "amount": {"value": f"{TICKET_PRICE:.2f}", "currency": "RUB"},
                     "vat_code": 1,
                     "payment_mode": "full_prepayment",
-                    "payment_subject": "commodity" # Наклейка - это товар (commodity)
+                    "payment_subject": "commodity"
                 }]
             },
             "metadata": {
                 "tg_id": str(message.from_user.id),
                 "name": name,
                 "phone": phone,
-                "count": str(codes_to_generate) # ВАЖНО: передаем итоговое количество кодов для их генерации
+                "count": str(codes_to_generate)
             }
         }
-        
+
         payment = Payment.create(payment_data, uuid.uuid4())
         confirmation_url = payment.confirmation.confirmation_url
-        
+
     except Exception as e:
         await message.answer("❌ Ошибка при создании платежа. Пожалуйста, попробуйте позже.")
         logging.error("Ошибка создания платежа YooKassa:", exc_info=True)
@@ -323,9 +310,122 @@ async def process_ticket_count(message: types.Message, state: FSMContext):
     pay_kb = InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="💳 Перейти к оплате", url=confirmation_url)]
     ])
-    # Убираем старый summary и отправляем новый, более структурированный
     await message.answer(summary, reply_markup=pay_kb, parse_mode=ParseMode.HTML)
     await state.clear()
+
+
+
+# @dp.message(Form.ticket_count)
+# async def process_ticket_count(message: types.Message, state: FSMContext):
+#     global available_tickets
+#     try:
+#         # Получаем количество наклеек, которое пользователь хочет КУПИТЬ
+#         count = int(message.text.strip())
+#         if count <= 0:
+#             raise ValueError("Количество должно быть положительным")
+#     except (ValueError, TypeError):
+#         await message.answer("❗ Введите корректное число наклеек.")
+#         return
+
+#     # --- Новая логика расчета кодов и применения акции ---
+#     # По умолчанию количество кодов равно количеству купленных наклеек
+#     codes_to_generate = count
+#     discount_applied = False
+#     now = datetime.now()
+
+#     # Проверяем, активна ли акция (6 часов с момента старта бота)
+#     if (now - BOT_START_TIME) <= timedelta(hours=14):
+#         # Если акция активна и пользователь покупает РОВНО 2 наклейки
+#         if count == 3:
+#             codes_to_generate = 4  # Даем 3 кода (2 купленных + 1 бонусный)
+#             discount_applied = True  # Ставим флаг, чтобы показать сообщение об акции
+
+#     # Цена ВСЕГДА рассчитывается по количеству КУПЛЕННЫХ наклеек
+#     price = TICKET_PRICE * count
+
+#     # Сохраняем в FSM и цену, и ИТОГОВОЕ количество кодов
+#     await state.update_data(
+#         ticket_count=count,          # Сколько наклеек купил
+#         price=price,
+#         final_code_count=codes_to_generate  # Сколько кодов в итоге получит
+#     )
+#     user_data = await state.get_data()
+#     name = user_data.get("name")
+#     phone = user_data.get("phone")
+
+#     if not name or not phone:
+#         await message.answer("❗ Не удалось получить данные анкеты. Попробуйте заполнить заново, нажав /start.")
+#         await state.clear()
+#         return
+
+#     # --- Формируем понятное сообщение для пользователя ---
+#     summary = f"✅ Количество наклеек к покупке: {count}\n💰 Cтоимость: {price} руб\n"
+
+#     if discount_applied:
+#         summary += f"🎉 <b>Применено спец. предложение!</b> Вы получите <b>{codes_to_generate} персональных кодов!</b>\n"
+#     else:
+#         summary += f"🎁 Количество персональных кодов: {codes_to_generate}\n"
+
+
+#     summary += (
+#         f"\nКоличество наклеек забронировано для тебя на 5 минут👌\n\n"
+#         f"‼️<b><i>ВНИМАНИЕ</i></b>‼️ Убедительная просьба "
+#         f"<b><i>оплачивать только по СБП и сделать</i></b> "
+#         f"<b><i>скриншот чека!!!</i></b>\n\n"
+#         f"После оплаты придет сообщение с твоим "
+#         f"персональным кодом участника🥳\n\n"
+#         f"Если возникли сложности, напиши нам "
+#         f"в телеграмме по номеру +79995295511\n\n"
+#         f"<b><i>Если все понятно, жми 'перейти к оплате'</i></b>\n"
+#         f"⬇️"
+#     )
+
+#     try:
+#         payment_price_str = f"{price:.2f}"
+#         bot_info = await bot.get_me()
+
+#         payment_data = {
+#             "amount": {"value": payment_price_str, "currency": "RUB"},
+#             "confirmation": {
+#                 "type": "redirect",
+#                 "return_url": f"https://t.me/{bot_info.username}?start=payment_done"
+#             },
+#             "capture": True,
+#             "description": f"Покупка {count} наклеек, НДС не облагается. Пользователь: {message.from_user.id}",
+#             "receipt": {
+#                 "customer": {"phone": phone},
+#                 "items": [{
+#                     "description": f"Фирменная наклейка NPAuto ({count} шт.)", # В чеке указываем реальное количество купленных наклеек
+#                     "quantity": str(count),
+#                     "amount": {"value": f"{TICKET_PRICE:.2f}", "currency": "RUB"}, # Цена за 1 шт.
+#                     "vat_code": 1,
+#                     "payment_mode": "full_prepayment",
+#                     "payment_subject": "commodity" # Наклейка - это товар (commodity)
+#                 }]
+#             },
+#             "metadata": {
+#                 "tg_id": str(message.from_user.id),
+#                 "name": name,
+#                 "phone": phone,
+#                 "count": str(codes_to_generate) # ВАЖНО: передаем итоговое количество кодов для их генерации
+#             }
+#         }
+        
+#         payment = Payment.create(payment_data, uuid.uuid4())
+#         confirmation_url = payment.confirmation.confirmation_url
+        
+#     except Exception as e:
+#         await message.answer("❌ Ошибка при создании платежа. Пожалуйста, попробуйте позже.")
+#         logging.error("Ошибка создания платежа YooKassa:", exc_info=True)
+#         await state.clear()
+#         return
+
+#     pay_kb = InlineKeyboardMarkup(inline_keyboard=[
+#         [InlineKeyboardButton(text="💳 Перейти к оплате", url=confirmation_url)]
+#     ])
+#     # Убираем старый summary и отправляем новый, более структурированный
+#     await message.answer(summary, reply_markup=pay_kb, parse_mode=ParseMode.HTML)
+#     await state.clear()
 
 
 # --- FLASK ВЕБХУК ---
