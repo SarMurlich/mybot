@@ -136,7 +136,7 @@ async def send_rules(callback: types.CallbackQuery):
 @dp.callback_query(F.data == "participate")
 async def handle_participation(callback: types.CallbackQuery):
     user_id = callback.from_user.id
-    channel_id = "@npcoolauto"
+    channel_id = "@npauto1"
 
     try:
         member = await callback.bot.get_chat_member(chat_id=channel_id, user_id=user_id)
