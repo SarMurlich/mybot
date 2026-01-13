@@ -69,7 +69,7 @@ async def send_welcome(message: types.Message):
         [InlineKeyboardButton(text='🔍 Узнать правила участия', callback_data='show_rules')]
     ])
 
-    photo_file_id = "AgACAgIAAxkBAAICx2hqkPpqYTYgLjcb4x6Nniyc7nuTAALb9TEbhJZZSzy800ilJfUOAQADAgADeQADNgQ"
+    photo_file_id = "AgACAgIAAxkBAAEglXRpZpM3M5Bz3WwyXpjK-BxXnF0xtAAChhNrG7yrMUvHVNR4Ze7jmgEAAwIAA3kAAzgE"
 
     caption_text = (
         f"<b><i>Привет! {html.bold(message.from_user.first_name)}, это бот-помощник команды NPAuto</i></b> 👋 \n\n"
