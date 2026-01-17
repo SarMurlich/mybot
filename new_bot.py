@@ -16,6 +16,11 @@ from yookassa import Configuration, Payment
 import uuid
 import threading
 from waitress import serve
+import csv
+import os
+from aiogram.filters import Command
+from aiogram.types import FSInputFile
+# ... остальные импорты ...
 
 # --- НАШИ МОДУЛИ ---
 from key import my_key
@@ -96,6 +101,66 @@ async def send_welcome(message: types.Message):
         reply_markup=inline_keyboard,
         parse_mode=ParseMode.HTML
     )
+
+@dp.message(Command("export"))
+async def export_csv(message: types.Message):
+    # ❗️ ЗАМЕНИ НА СВОЙ ID (иначе бот тебе не ответит)
+    ADMIN_ID = 494097833
+    
+    if message.from_user.id != ADMIN_ID:
+        return
+
+    json_file = "database.json"
+    csv_file = "raffle_data.csv"
+
+    # Проверяем, существует ли база
+    if not os.path.exists(json_file):
+        await message.answer("❌ База данных не найдена.")
+        return
+
+    try:
+        # 1. Читаем JSON
+        with open(json_file, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        
+        tickets = data.get("tickets", {})
+        
+        # 2. Создаем CSV (encoding='utf-8-sig' нужен, чтобы Excel правильно читал русский язык)
+        with open(csv_file, "w", newline='', encoding='utf-8-sig') as f:
+            writer = csv.writer(f, delimiter=';') # Используем точку с запятой для Excel
+            
+            # Заголовки столбцов
+            headers = ["Номер билета", "Тип билета", "Имя (Анкета)", "Телефон", "ID Telegram", "Дата покупки"]
+            writer.writerow(headers)
+
+            # Записываем данные построчно
+            # Сортируем билеты по номеру (превращаем ключи в int для правильной сортировки)
+            sorted_ids = sorted(tickets.keys(), key=lambda x: int(x))
+            
+            for t_id in sorted_ids:
+                ticket_info = tickets[t_id]
+                
+                # Собираем строку
+                row = [
+                    t_id,                                      # Номер
+                    ticket_info.get("type", "unknown"),        # Тип (main/bonus)
+                    ticket_info.get("owner_name", "-"),        # Имя
+                    ticket_info.get("owner_phone", "-"),       # Телефон
+                    str(ticket_info.get("user_id", "-")),      # ID
+                    ticket_info.get("purchase_date", "-")      # Дата
+                ]
+                writer.writerow(row)
+
+        # 3. Отправляем файл
+        await message.answer_document(
+            FSInputFile(csv_file),
+            caption=f"📊 Выгрузка билетов на {datetime.now().strftime('%d.%m.%Y %H:%M')}\n"
+                    f"Всего билетов: {len(tickets)}"
+        )
+
+    except Exception as e:
+        await message.answer(f"❌ Ошибка при экспорте: {e}")
+        logging.error("Export error:", exc_info=True)
 
 # ... (остальные хендлеры до process_ticket_count остаются без изменений) ...
 
