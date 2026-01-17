@@ -131,9 +131,9 @@ async def send_rules(callback: types.CallbackQuery):
 
     await callback.message.answer(
         #video="BAACAgIAAxkBAAMFaF_JunR6fKD6Dq6lHtOJflr8hsAAAptwAAI3qwABS5CXnF6ECpdsNgQ",
-        caption_text
-        #reply_markup=inline_kb,
-        #parse_mode=ParseMode.HTML
+        caption_text,
+        reply_markup=inline_kb,
+        parse_mode=ParseMode.HTML
     )
 
 @dp.callback_query(F.data == "participate")
