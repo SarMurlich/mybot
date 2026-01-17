@@ -130,7 +130,7 @@ async def send_rules(callback: types.CallbackQuery):
     )
 
     await callback.message.answer_video(
-        video="BAACAgIAAxkBAAMFaF_JunR6fKD6Dq6lHtOJflr8hsAAAptwAAI3qwABS5CXnF6ECpdsNgQ",
+        #video="BAACAgIAAxkBAAMFaF_JunR6fKD6Dq6lHtOJflr8hsAAAptwAAI3qwABS5CXnF6ECpdsNgQ",
         caption=caption_text, # Используем исправленный текст
         reply_markup=inline_kb,
         parse_mode=ParseMode.HTML
