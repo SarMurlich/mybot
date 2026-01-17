@@ -223,25 +223,26 @@ async def process_phone(message: types.Message, state: FSMContext):
 @dp.message(Form.ticket_count)
 async def process_ticket_count(message: types.Message, state: FSMContext):
     try:
+        # 1. Проверяем, что ввели число
         count = int(message.text.strip())
         if count <= 0:
             raise ValueError("Количество должно быть положительным")
     except (ValueError, TypeError):
-        await message.answer("❗ Введите корректное число наклеек.")
+        await message.answer("❗️ Введите корректное число наклеек (цифрами).")
         return
 
-    # --- Новая логика спец. предложения ---
-    bonus_codes = count // 2  # 1 бонусный код за каждые 3 наклейки
-    codes_to_generate = count #+ bonus_codes
-
-    # Всегда рассчитываем цену по количеству КУПЛЕННЫХ наклеек
+    # 2. Рассчитываем бонусы и цену
+    # Акция: 1 бонусный код за каждые 3 купленные наклейки
+    bonus_codes = count // 3  
+    total_codes = count + bonus_codes
+    
+    # Цена считается только за КУПЛЕННЫЕ
     price = TICKET_PRICE * count
 
-    # Сохраняем данные в состояние
+    # Сохраняем в состояние (хотя для платежа данные берем сразу)
     await state.update_data(
         ticket_count=count,
-        price=price,
-        final_code_count=codes_to_generate
+        price=price
     )
 
     user_data = await state.get_data()
@@ -249,29 +250,36 @@ async def process_ticket_count(message: types.Message, state: FSMContext):
     phone = user_data.get("phone")
 
     if not name or not phone:
-        await message.answer("❗ Не удалось получить данные анкеты. Попробуйте заполнить заново, нажав /start.")
+        await message.answer("❗️ Не удалось получить данные анкеты. Нажмите /start для перезапуска.")
         await state.clear()
         return
 
-    # --- Сообщение пользователю ---
-    summary = f"✅ Количество наклеек к покупке: {count}\n💰 Стоимость: {price} руб\n"
+    # 3. Формируем текст сообщения для пользователя
+    summary = (
+        f"✅ Количество наклеек к покупке: <b>{count}</b>\n"
+        f"💰 Стоимость: <b>{price} руб</b>\n"
+    )
+
     if bonus_codes > 0:
-        summary += f"🎁 Бонус по акции: +{bonus_codes} персональных кодов!\n"
+        summary += f"🎁 <b>Бонус по акции: +{bonus_codes} доп. кодов!</b>\n"
 
     summary += (
-        f"🔢 Итого персональных кодов: {codes_to_generate}\n\n"
+        f"🔢 Итого вы получите персональных кодов: <b>{total_codes}</b>\n\n"
+        f"<i>(Из них {count} основных участвуют в розыгрыше Porsche Cayenne S,\n"
+        f"а бонусные коды увеличивают шансы на другие призы!)</i>\n\n" # Текст можно поправить под ваши правила
         f"Количество наклеек забронировано для тебя на 5 минут👌\n\n"
         f"‼️<b><i>ВНИМАНИЕ</i></b>‼️ Убедительная просьба "
         f"<b><i>оплачивать только по СБП и сделать</i></b> "
         f"<b><i>скриншот чека!!!</i></b>\n\n"
-        f"После оплаты придет сообщение с твоим "
-        f"персональным кодом участника🥳\n\n"
+        f"После оплаты придет сообщение с твоими "
+        f"персональными кодами участника🥳\n\n"
         f"Если возникли сложности, напиши нам "
         f"в телеграмме по номеру +79995295511\n\n"
         f"<b><i>Если все понятно, жми 'перейти к оплате'</i></b>\n"
         f"⬇️"
     )
 
+    # 4. Создаем платеж в ЮКассе
     try:
         payment_price_str = f"{price:.2f}"
         bot_info = await bot.get_me()
@@ -283,12 +291,12 @@ async def process_ticket_count(message: types.Message, state: FSMContext):
                 "return_url": f"https://t.me/{bot_info.username}?start=payment_done"
             },
             "capture": True,
-            "description": f"Покупка {count} наклеек, НДС не облагается. Пользователь: {message.from_user.id}",
+            "description": f"Покупка {count} накл. (+{bonus_codes} бонус). User: {message.from_user.id}",
             "receipt": {
                 "customer": {"phone": phone},
                 "items": [{
                     "description": f"Фирменная наклейка NPAuto ({count} шт.)",
-                    "quantity": str(count),
+                    "quantity": str(count), # В чеке только платные
                     "amount": {"value": f"{TICKET_PRICE:.2f}", "currency": "RUB"},
                     "vat_code": 1,
                     "payment_mode": "full_prepayment",
@@ -299,7 +307,9 @@ async def process_ticket_count(message: types.Message, state: FSMContext):
                 "tg_id": str(message.from_user.id),
                 "name": name,
                 "phone": phone,
-                "count": str(codes_to_generate)
+                # ВАЖНО: Передаем раздельно, чтобы база данных знала, как генерировать номера
+                "paid_count": str(count),      # Эти пойдут в случайные 1-555
+                "bonus_count": str(bonus_codes) # Эти пойдут последовательно 556+
             }
         }
 
@@ -312,130 +322,13 @@ async def process_ticket_count(message: types.Message, state: FSMContext):
         await state.clear()
         return
 
+    # 5. Отправляем кнопку оплаты
     pay_kb = InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="💳 Перейти к оплате", url=confirmation_url)]
     ])
     await message.answer(summary, reply_markup=pay_kb, parse_mode=ParseMode.HTML)
     await state.clear()
 
-
-
-# @dp.message(Form.ticket_count)
-# async def process_ticket_count(message: types.Message, state: FSMContext):
-#     global available_tickets
-#     try:
-#         # Получаем количество наклеек, которое пользователь хочет КУПИТЬ
-#         count = int(message.text.strip())
-#         if count <= 0:
-#             raise ValueError("Количество должно быть положительным")
-#     except (ValueError, TypeError):
-#         await message.answer("❗ Введите корректное число наклеек.")
-#         return
-
-#     # --- Новая логика расчета кодов и применения акции ---
-#     # По умолчанию количество кодов равно количеству купленных наклеек
-#     codes_to_generate = count
-#     discount_applied = False
-#     now = datetime.now()
-
-#     # Проверяем, активна ли акция (6 часов с момента старта бота)
-#     if (now - BOT_START_TIME) <= timedelta(hours=14):
-#         # Если акция активна и пользователь покупает РОВНО 2 наклейки
-#         if count == 3:
-#             codes_to_generate = 4  # Даем 3 кода (2 купленных + 1 бонусный)
-#             discount_applied = True  # Ставим флаг, чтобы показать сообщение об акции
-
-#     # Цена ВСЕГДА рассчитывается по количеству КУПЛЕННЫХ наклеек
-#     price = TICKET_PRICE * count
-
-#     # Сохраняем в FSM и цену, и ИТОГОВОЕ количество кодов
-#     await state.update_data(
-#         ticket_count=count,          # Сколько наклеек купил
-#         price=price,
-#         final_code_count=codes_to_generate  # Сколько кодов в итоге получит
-#     )
-#     user_data = await state.get_data()
-#     name = user_data.get("name")
-#     phone = user_data.get("phone")
-
-#     if not name or not phone:
-#         await message.answer("❗ Не удалось получить данные анкеты. Попробуйте заполнить заново, нажав /start.")
-#         await state.clear()
-#         return
-
-#     # --- Формируем понятное сообщение для пользователя ---
-#     summary = f"✅ Количество наклеек к покупке: {count}\n💰 Cтоимость: {price} руб\n"
-
-#     if discount_applied:
-#         summary += f"🎉 <b>Применено спец. предложение!</b> Вы получите <b>{codes_to_generate} персональных кодов!</b>\n"
-#     else:
-#         summary += f"🎁 Количество персональных кодов: {codes_to_generate}\n"
-
-
-#     summary += (
-#         f"\nКоличество наклеек забронировано для тебя на 5 минут👌\n\n"
-#         f"‼️<b><i>ВНИМАНИЕ</i></b>‼️ Убедительная просьба "
-#         f"<b><i>оплачивать только по СБП и сделать</i></b> "
-#         f"<b><i>скриншот чека!!!</i></b>\n\n"
-#         f"После оплаты придет сообщение с твоим "
-#         f"персональным кодом участника🥳\n\n"
-#         f"Если возникли сложности, напиши нам "
-#         f"в телеграмме по номеру +79995295511\n\n"
-#         f"<b><i>Если все понятно, жми 'перейти к оплате'</i></b>\n"
-#         f"⬇️"
-#     )
-
-#     try:
-#         payment_price_str = f"{price:.2f}"
-#         bot_info = await bot.get_me()
-
-#         payment_data = {
-#             "amount": {"value": payment_price_str, "currency": "RUB"},
-#             "confirmation": {
-#                 "type": "redirect",
-#                 "return_url": f"https://t.me/{bot_info.username}?start=payment_done"
-#             },
-#             "capture": True,
-#             "description": f"Покупка {count} наклеек, НДС не облагается. Пользователь: {message.from_user.id}",
-#             "receipt": {
-#                 "customer": {"phone": phone},
-#                 "items": [{
-#                     "description": f"Фирменная наклейка NPAuto ({count} шт.)", # В чеке указываем реальное количество купленных наклеек
-#                     "quantity": str(count),
-#                     "amount": {"value": f"{TICKET_PRICE:.2f}", "currency": "RUB"}, # Цена за 1 шт.
-#                     "vat_code": 1,
-#                     "payment_mode": "full_prepayment",
-#                     "payment_subject": "commodity" # Наклейка - это товар (commodity)
-#                 }]
-#             },
-#             "metadata": {
-#                 "tg_id": str(message.from_user.id),
-#                 "name": name,
-#                 "phone": phone,
-#                 "count": str(codes_to_generate) # ВАЖНО: передаем итоговое количество кодов для их генерации
-#             }
-#         }
-        
-#         payment = Payment.create(payment_data, uuid.uuid4())
-#         confirmation_url = payment.confirmation.confirmation_url
-        
-#     except Exception as e:
-#         await message.answer("❌ Ошибка при создании платежа. Пожалуйста, попробуйте позже.")
-#         logging.error("Ошибка создания платежа YooKassa:", exc_info=True)
-#         await state.clear()
-#         return
-
-#     pay_kb = InlineKeyboardMarkup(inline_keyboard=[
-#         [InlineKeyboardButton(text="💳 Перейти к оплате", url=confirmation_url)]
-#     ])
-#     # Убираем старый summary и отправляем новый, более структурированный
-#     await message.answer(summary, reply_markup=pay_kb, parse_mode=ParseMode.HTML)
-#     await state.clear()
-
-
-# --- FLASK ВЕБХУК ---
-
-# --- FLASK ВЕБХУК ---
 
 async def send_success_message(user_id: int, ticket_numbers: list[str]):
     """Асинхронно отправляет сообщение об успехе вместе с видео."""    
@@ -486,22 +379,31 @@ async def send_success_message(user_id: int, ticket_numbers: list[str]):
 
 @app.route('/yookassa/webhook', methods=['POST'])
 def yookassa_webhook():
-    print("🔔 Вебхук получен от YooKassa")
+    print("🔔 Вебхук получен")
     try:
         data = request.json
-        print("Тело вебхука:", data)
-
         if data.get('event') == 'payment.succeeded':
             metadata = data['object']['metadata']
+            
             user_id = int(metadata['tg_id'])
             name = metadata['name']
             phone = metadata['phone']
-            count = int(metadata['count'])
+            
+            # Читаем новые поля
+            paid_count = int(metadata.get('paid_count', 0))
+            bonus_count = int(metadata.get('bonus_count', 0))
 
-            print(f"Успешная оплата от {name} (ID: {user_id}) на {count} наклеек.")
+            print(f"💰 Оплата: {name}, куплено: {paid_count}, бонус: {bonus_count}")
 
-            # Добавляем билеты в нашу JSON-базу
-            ticket_numbers = add_tickets_for_payment(user_id, name, phone, count)
+            # Вызываем НОВУЮ функцию добавления билетов
+            ticket_numbers = add_tickets_for_payment(
+                user_id, name, phone, 
+                paid_count=paid_count, 
+                bonus_count=bonus_count
+            )
+            
+            # Сортируем билеты для красоты (чтобы сначала шли мелкие номера)
+            ticket_numbers.sort()
             ticket_numbers_str = [str(num) for num in ticket_numbers]
 
             main_loop = g.get('main_loop')
@@ -510,11 +412,9 @@ def yookassa_webhook():
                     send_success_message(user_id, ticket_numbers_str),
                     main_loop
                 )
-            else:
-                logging.error("Event loop не найден или не запущен!")
 
     except Exception as e:
-        logging.error(f"Ошибка в обработчике вебхука: {e}", exc_info=True)
+        logging.error(f"Webhook error: {e}", exc_info=True)
 
     return '', 200
 
