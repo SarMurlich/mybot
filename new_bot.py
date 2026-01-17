@@ -129,12 +129,12 @@ async def send_rules(callback: types.CallbackQuery):
         "в нашем ТГ канале!🎁"
     )
 
-    #await callback.message.answer_video(
+    await callback.message.answer(
         #video="BAACAgIAAxkBAAMFaF_JunR6fKD6Dq6lHtOJflr8hsAAAptwAAI3qwABS5CXnF6ECpdsNgQ",
-        #caption=caption_text,
+        caption_text
         #reply_markup=inline_kb,
         #parse_mode=ParseMode.HTML
-    #)
+    )
 
 @dp.callback_query(F.data == "participate")
 async def handle_participation(callback: types.CallbackQuery):
