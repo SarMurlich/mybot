@@ -233,8 +233,8 @@ async def process_ticket_count(message: types.Message, state: FSMContext):
 
     # 2. Рассчитываем бонусы и цену
     # Акция: 1 бонусный код за каждые 3 купленные наклейки
-    bonus_codes = count // 3  
-    total_codes = count + bonus_codes
+    bonus_codes = 0 #count // 3  
+    total_codes = count #+ bonus_codes
     
     # Цена считается только за КУПЛЕННЫЕ
     price = TICKET_PRICE * count
