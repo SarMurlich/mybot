@@ -20,6 +20,7 @@ import csv
 import os
 from aiogram.filters import Command
 from aiogram.types import FSInputFile
+import json
 # ... остальные импорты ...
 
 # --- НАШИ МОДУЛИ ---
