@@ -215,7 +215,8 @@ async def process_phone(message: types.Message, state: FSMContext):
                         # f"ты получаешь в подарок\n"
                         # f"1 дополнительный персональный код</i></b>🤩\n\n"
                         # f"<i>*спец. предложение действует 17.07.2025</i>\n"
-                         f"<i>с 7:00 до 21:00</i>\n")
+                        #f"<i>с 7:00 до 21:00</i>\n"
+                        )
     await state.set_state(Form.ticket_count)
 
 
@@ -230,8 +231,8 @@ async def process_ticket_count(message: types.Message, state: FSMContext):
         return
 
     # --- Новая логика спец. предложения ---
-    bonus_codes = count // 3  # 1 бонусный код за каждые 3 наклейки
-    codes_to_generate = count + bonus_codes
+    bonus_codes = count // 2  # 1 бонусный код за каждые 3 наклейки
+    codes_to_generate = count #+ bonus_codes
 
     # Всегда рассчитываем цену по количеству КУПЛЕННЫХ наклеек
     price = TICKET_PRICE * count
