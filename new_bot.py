@@ -106,7 +106,7 @@ async def send_welcome(message: types.Message):
 @dp.message(Command("export"))
 async def export_csv(message: types.Message):
     # ❗️ ЗАМЕНИ НА СВОЙ ID (иначе бот тебе не ответит)
-    ADMIN_ID = 494097833
+    ADMIN_ID = 908779100
     
     if message.from_user.id != ADMIN_ID:
         return
